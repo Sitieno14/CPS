@@ -1,0 +1,147 @@
+#   ____ ____  ____
+#  / ___|  _ \/ ___|
+# | |   | |_) \___ \
+# | |___|  __/ ___) |
+#  \____|_|   |____/
+#CPS (https://www.spigotmc.org/resources/cps.54097/)
+#======================================================================================
+#        Description: Track and compete over Clicks Per Second in your Minecraft Server
+#             Author: Sitieno14
+#            License: http://creativecommons.org/licenses/by-nc-sa/4.0/
+#            Version: 2.0
+#
+#   Spigot - Profile: https://tinyurl.com/spigotmc-sitieno14
+# Spigot - Resources: https://tinyurl.com/spigotmc-bysitieno14
+#   Spigot - Support: https://tinyurl.com/spigotmc-tositieno14
+#
+# Telegram - Channel: https://telegram.me/Sitieno14
+# Telegram - Contact: https://telegram.me/Sitieno14_bot
+#======================================================================================
+
+options:
+	default-cps: 0				#default CPS for new players
+	#when changing this it would be better to execute /cps reset from console
+
+	x-seconds: 10				#CPS will be the average of x seconds of leftclicking
+
+	leaderboard-positions: 5	#positions to be provided in /cps top
+	#when changing this it would be better to execute /cps reset from console
+
+	command: cps				#/<command>
+	prefix: &9CPS
+	separator: &b»
+
+command /{@command} [<offline player=%player%>]:
+	trigger:
+		if arg 1 is "help":
+			send "{@prefix}"
+			send "&7/&f{@command} &ahelp"
+			send "&7/&f{@command} &7[<player>]"
+			send "&7/&f{@command} &btop"
+			if executor isn't a player:
+				send "%nl%&7/&f{@command} &2version"
+				send "&7/&f{@command} &creset"
+				send "&7/&f{@command} &4purge"
+		else if arg 1 is "top":
+			send "{@prefix}"
+			loop numbers from 1 to {@leaderboard-positions}:
+				if {cps::leaderboard::%loop-value%} is set:
+					send "&6%loop-value% {@separator} &f%{cps::leaderboard::%loop-value%}% {@separator} &a%{cps::highest::%{cps::leaderboard::%loop-value%}%}%"
+				else:
+					send "&6%loop-value% {@separator}"
+		else if executor isn't a player:
+			if arg 1 is "reset":
+				loop {cps::leaderboard::*}:
+					log "{cps::leaderboard::%loop-index%}: %{cps::leaderboard::%loop-index%}% -> <none>"
+					delete {cps::leaderboard::%loop-index%}
+				delete {cps::leaderboard::*}
+
+				loop {cps::highest::*}:
+					log "{cps::highest::%loop-index%}: %{cps::highest::%loop-index%}% -> {@default-cps}"
+					set {cps::highest::%loop-index%} to {@default-cps}
+	
+				log "✓"
+			else if arg 1 is "purge":
+				loop {cps::leaderboard::*}:
+					log "{cps::leaderboard::%loop-index%}: %{cps::leaderboard::%loop-index%}% -> <none>"
+					delete {cps::leaderboard::%loop-index%}
+				delete {cps::leaderboard::*}
+
+				loop {cps::highest::*}:
+					if loop-index parsed as offline player is online:
+						log "{cps::highest::%loop-index%}: %{cps::highest::%loop-index%}% -> {@default-cps}"
+						set {cps::highest::%loop-index%} to {@default-cps}
+					else:
+						log "{cps::highest::%loop-index%}: %{cps::highest::%loop-index%}% -> <none>"
+						delete {cps::highest::%loop-index%}
+
+				log "✓"
+			else:
+				set {_pre} to uncolored "{@prefix}"
+				set {_sep} to uncolored "{@separator}"
+				if arg 1 isn't set:
+					log "%{_pre}% %{_sep}% (/{@command} help)"
+				else if {cps::highest::%arg 1%} isn't set:
+					log "%{_pre}% %{_sep}% %arg 1% %{_sep}% (/{@command} help)"
+				else:
+					log "%{_pre}% %{_sep}% %arg 1% %{_sep}% %{cps::highest::%arg 1%}% (/{@command} help)"
+		else:
+			if {cps::highest::%arg 1%} is set:
+				send "{@prefix} {@separator} &f%arg 1% {@separator} &a%{cps::highest::%arg 1%}% &7(/&f{@command} help&7)"
+			else:
+				send "{@prefix} {@separator} &f%arg 1% {@separator} &7(/&f{@command} help&7)"
+
+on leftclick:
+	if target block is set:
+		if distance between player and target block is less than 5:
+			stop
+	if {cps::latest::%player%} isn't set:
+		add 1 to {cps::latest::%player%}
+		wait {@x-seconds} seconds
+		{cps::latest::%player%} is set
+		set {_clicks} to {cps::latest::%player%}
+		delete {cps::latest::%player%}
+		set {_cps} to {_clicks} / {@x-seconds}
+
+		send action bar "&eClicks ({@x-seconds}s): &a%{_clicks}% &7- &eCPS&7: &a%{_cps}%" to player
+		if {_cps} is more than {cps::highest::%player%}:
+			send "{@prefix} {@separator} &c%{cps::highest::%player%}% → &a%{_cps}% &7(/&f{@command}&7)"
+			set {cps::highest::%player%} to {_cps}
+
+			if {cps::highest::%{cps::leaderboard::{@leaderboard-positions}}%} is set:
+				if {cps::highest::%player%} is less than {cps::highest::%{cps::leaderboard::{@leaderboard-positions}}%}:
+					stop
+
+			loop numbers from 1 to {@leaderboard-positions}:
+				if {cps::leaderboard::%loop-value%} isn't set:
+					set {cps::leaderboard::%loop-value%} to player
+					send "&6%loop-value% {@separator} &f%player% {@separator} &a%{cps::highest::%player%}% &7(/&f{@command} top&7)"
+					stop
+			
+				if {cps::leaderboard::%loop-value%} is player:
+					stop
+
+				if {cps::highest::%player%} is more than {cps::highest::%{cps::leaderboard::%loop-value%}%}:
+					if {cps::leaderboard::%(loop-value) + 1%} is player:
+						set {_a} to {cps::leaderboard::%loop-value%}
+						set {cps::leaderboard::%loop-value%} to player
+						send "&6%loop-value% {@separator} &f%player% {@separator} &a%{cps::highest::%player%}% &7(/&f{@command} top&7)"
+						set {cps::leaderboard::%(loop-value) + 1%} to {_a}
+						stop
+
+					loop numbers from {@leaderboard-positions} to loop-value + 1:
+						if {cps::leaderboard::%(loop-value-2) - 1%} isn't player:
+							set {cps::leaderboard::%loop-value-2%} to {cps::leaderboard::%(loop-value-2) - 1%}
+					
+					set {cps::leaderboard::%loop-value%} to player
+					send "&6%loop-value% {@separator} &f%player% {@separator} &a%{cps::highest::%player%}% &7(/&f{@command} top&7)"
+
+					stop
+		stop
+	add 1 to {cps::latest::%player%}
+
+on join:
+	if {cps::latest::%player%} is set:
+		delete {cps::latest::%player%}
+	if {cps::highest::%player%} isn't set:
+		set {cps::highest::%player%} to {@default-cps}
